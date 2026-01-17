@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구룡투 Online</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #2c3e50; color: white; margin: 0; padding: 10px; }
+        .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; }
+        .tile-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px auto; max-width: 300px; }
+        .tile { height: 80px; background: #ecf0f1; color: #2c3e50; font-size: 2rem; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .tile:disabled { background: #7f8c8d; color: #bdc3c7; cursor: not-allowed; }
+        #status { font-size: 1.2rem; color: #f1c40f; height: 50px; margin: 15px 0; }
+        .chat-area { background: white; color: black; height: 150px; overflow-y: auto; border-radius: 5px; margin-top: 20px; text-align: left; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>NINE DRAGONS</h1>
+    <div class="score-board" id="score-display">플레이어 대기 중...</div>
+    <div id="status">닉네임을 입력하세요!</div>
+    
+    <div class="tile-container" id="tiles">
+        <script>
+            for(let i=1; i<=9; i++) {
+                document.write(`<button class="tile" id="t${i}" onclick="pick(${i})">${i}</button>`);
+            }
+        </script>
+    </div>
+
+    <div class="chat-area" id="chat"></div>
+    <input type="text" id="msg" style="width:70%" onkeypress="if(event.keyCode==13) sendMsg()">
+    <button onclick="sendMsg()">전송</button>
+
+    <script>
+        const socket = io();
+        let name = "";
+
+        socket.on('connect', () => {
+            name = prompt("닉네임:");
+            socket.emit('join', {name: name});
+        });
+
+        function pick(n) {
+            socket.emit('choice', {pick: n});
+            document.getElementById(`t${n}`).disabled = true;
+            document.getElementById('status').innerText = n + "번 제출! 상대 대기 중...";
+        }
+
+        socket.on('opponent_ready', () => {
+            document.getElementById('status').innerText = "상대방이 타일을 제출했습니다!";
+        });
+
+        socket.on('round_result', (data) => {
+            document.getElementById('status').innerHTML = `결과: ${data.winner}<br>${data.p1_name}(${data.p1_pick}) vs ${data.p2_name}(${data.p2_pick})`;
+            let scoreTxt = "";
+            for(let p in data.scores) scoreTxt += `${p}: ${data.scores[p]}점  `;
+            document.getElementById('score-display').innerText = scoreTxt;
+        });
+
+        function sendMsg() {
+            const m = document.getElementById('msg');
+            socket.emit('message', {msg: m.value});
+            m.value = "";
+        }
+
+        socket.on('new_message', (d) => {
+            document.getElementById('chat').innerHTML += `<div><b>${d.name}:</b> ${d.msg}</div>`;
+            document.getElementById('chat').scrollTop = 9999;
+        });
+    </script>
+</body>
+</html>
